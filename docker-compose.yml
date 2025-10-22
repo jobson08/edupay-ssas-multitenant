@@ -1,0 +1,24 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: edupay
+      POSTGRES_PASSWORD: edupay
+      POSTGRES_DB: edupay
+    ports:
+      - '5432:5432'
+    volumes:
+      - db_data:/var/lib/postgresql/data
+  backend:
+    build: ./backend
+    command: sh -c "npm install && npx prisma migrate deploy && npm run dev"
+    environment:
+      DATABASE_URL: "postgresql://edupay:edupay@db:5432/edupay"
+      JWT_SECRET: "devsecret"
+    ports:
+      - '4000:4000'
+    depends_on:
+      - db
+volumes:
+  db_data:
