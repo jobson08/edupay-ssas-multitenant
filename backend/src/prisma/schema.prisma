@@ -1,0 +1,128 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Tenant {
+  id            String               @id @default(uuid())
+  name          String
+  slug          String               @unique
+  plan          String               // Ex.: "basico", "pro"
+  domain        String?
+  siteData      Json?                // Ex.: { title, description, logoUrl, primaryColor }
+  status        String               // ativo, suspenso, teste, cancelado
+  alunos        Aluno[]
+  atividades    Atividade[]          // Atividades escolhidas (futebol, crossfit, academia)
+  categoriasIdade CategoriaIdade[]   // Categorias de idade por tenant
+  users         User[]               // Relação com User
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+}
+
+model User {
+  id            String               @id @default(uuid())
+  name          String?
+  email         String               @unique
+  passwordHash  String
+  role          String               // ADMIN, ALUNO, SUPERADMIN, PROFESSOR, RH, SEGURANCA, OUTRO
+  departamento   String?
+  tenantId      String
+  tenant        Tenant               @relation(fields: [tenantId], references: [id])
+  mensalidades  Mensalidade[]
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+}
+model Atividade {
+  id            String               @id @default(uuid())
+  tenantId      String
+  tenant        Tenant               @relation(fields: [tenantId], references: [id])
+  nome          String               // Ex.: "Futebol", "CrossFit", "Academia"
+  requerIdade   Boolean              @default(false) // Novo: indica se usa categorias de idade
+  categoriasIdade CategoriaIdade[]   // Categorias de idade (ex.: Sub-7 para futebol)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+}
+
+model CategoriaIdade {
+  id            String               @id @default(uuid())
+  tenantId      String
+  tenant        Tenant               @relation(fields: [tenantId], references: [id])
+  atividadeId   String
+  atividade     Atividade            @relation(fields: [atividadeId], references: [id])
+  nome          String               // Ex.: "Sub-7", "Sub-9"
+  idadeMaxima   Int                  // Ex.: 7
+  alunos        Aluno[]              // Alunos associados
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+}
+
+model Aluno {
+  id            String               @id @default(uuid())
+  name          String
+  birthDate     DateTime?
+  peso          Float?
+  altura        Float?
+  categoriaId   String?
+  categoria     CategoriaIdade?      @relation(fields: [categoriaId], references: [id])
+  responsavelId String?
+  responsavel   Responsavel?         @relation(fields: [responsavelId], references: [id])
+  tenantId      String
+  tenant        Tenant               @relation(fields: [tenantId], references: [id])
+  mensalidades  Mensalidade[]
+  desenvolvimentos DesenvolvimentoMensal[]
+  desempenhos   DesempenhoAtividade[]
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+}
+
+model Responsavel {
+  id            String               @id @default(uuid())
+  nome          String
+  email         String?
+  cpf           String?
+  telefone      String?
+  alunos        Aluno[]
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+}
+
+model Mensalidade {
+  id            String               @id @default(uuid())
+  alunoId       String?
+  userId        String?
+  valor         Float
+  vencimento    DateTime
+  status        String               // pendente, pago, atrasado
+  tipo          String               // aluno, funcionario
+  aluno         Aluno?               @relation(fields: [alunoId], references: [id])
+  user          User?                @relation(fields: [userId], references: [id])
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+}
+
+model DesenvolvimentoMensal {
+  id            String               @id @default(uuid())
+  alunoId       String
+  aluno         Aluno                @relation(fields: [alunoId], references: [id])
+  mes           Int                  // 1-12
+  ano           Int                  // Ex.: 2025
+  comentario    String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+}
+
+model DesempenhoAtividade {
+  id            String               @id @default(uuid())
+  alunoId       String
+  aluno         Aluno                @relation(fields: [alunoId], references: [id])
+  atividade      String               // Ex.: "futebol", "crossfit"
+  data          DateTime
+  metrica       Json?                // Ex.: { gols: 2 } ou { wod: "Fran", tempo: "5:30" }
+  comentario    String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+}
