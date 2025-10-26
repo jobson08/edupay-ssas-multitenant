@@ -9,4 +9,9 @@ const calcularIdade = (birthDate) => {
   return idade;
 };
 
-module.exports = { calcularIdade };
+const isMaiorIdade = (birthDate) => {
+  if (!birthDate) return false;
+  return calcularIdade(birthDate) >= 18;
+};
+
+module.exports = { calcularIdade, isMaiorIdade };

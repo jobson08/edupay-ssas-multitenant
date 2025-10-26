@@ -8,6 +8,7 @@ const router = express.Router();
 
 const alunoSchema = z.object({
   name: z.string().min(1),
+  cpf: z.string().optional(), // Validado no controlador
   birthDate: z.string().optional(),
   peso: z.number().optional(),
   altura: z.number().optional(),

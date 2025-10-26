@@ -1,8 +1,9 @@
 const { prisma } = require('../server');
 const { ATIVIDADES_DISPONIVEIS, CATEGORIAS_PADRAO_FUTEBOL } = require('../services/atividadeService');
+const { cpf, cnpj } = require('cpf-cnpj-validator');
 
 const createTenant = async (req, res) => {
-  const { name, slug, plan, siteData, atividades, adminName, adminEmail } = req.body;
+  const { name, slug, plan, siteData, atividades, adminName, adminEmail, cpfCnpj } = req.body;
   try {
     // Validar atividades
     const atividadesValidas = atividades.every(a => ATIVIDADES_DISPONIVEIS.some(d => d.nome === a));
@@ -10,11 +11,17 @@ const createTenant = async (req, res) => {
       return res.status(400).json({ error: 'Atividade inválida' });
     }
 
+    // Validar CPF ou CNPJ (se fornecido)
+    if (cpfCnpj && !cpf.isValid(cpfCnpj) && !cnpj.isValid(cpfCnpj)) {
+      return res.status(400).json({ error: 'CPF ou CNPJ inválido' });
+    }
+
     // Criar tenant
     const tenant = await prisma.tenant.create({
       data: {
         name,
         slug,
+        cpfCnpj, // Novo campo
         plan: plan || 'basico',
         siteData,
         status: 'teste',

@@ -1,9 +1,20 @@
 const { prisma } = require('../server');
-const { calcularIdade } = require('../services/idadeService');
+const { calcularIdade, isMaiorIdade } = require('../services/idadeService');
+const { cpf } = require('cpf-cnpj-validator');
 
 const createAluno = async (req, res) => {
-  const { name, birthDate, peso, altura, responsavelId, tenantId, atividadeId } = req.body;
+  const { name, cpf, birthDate, peso, altura, responsavelId, tenantId, atividadeId } = req.body;
   try {
+    // Validar CPF para maiores de idade
+    if (birthDate && isMaiorIdade(birthDate) && (!cpf || !cpf.isValid(cpf))) {
+      return res.status(400).json({ error: 'CPF válido é obrigatório para alunos maiores de idade' });
+    }
+
+    // Validar CPF (se fornecido)
+    if (cpf && !cpf.isValid(cpf)) {
+      return res.status(400).json({ error: 'CPF inválido' });
+    }
+
     let categoriaId = null;
     const atividade = await prisma.atividade.findUnique({ where: { id: atividadeId } });
     if (birthDate && atividadeId && atividade?.requerIdade) {
@@ -18,14 +29,16 @@ const createAluno = async (req, res) => {
       });
       categoriaId = categoria?.id || null;
     }
+
     const aluno = await prisma.aluno.create({
       data: {
         name,
+        cpf, // Novo campo
         birthDate: birthDate ? new Date(birthDate) : null,
         peso: peso ? parseFloat(peso) : null,
         altura: altura ? parseFloat(altura) : null,
         categoriaId,
-        responsavelId,
+        responsavelId: isMaiorIdade(birthDate) ? null : responsavelId, // Nulo para maiores
         tenantId: tenantId || req.user.tenantId,
       },
     });
@@ -37,8 +50,18 @@ const createAluno = async (req, res) => {
 
 const updateAluno = async (req, res) => {
   const { id } = req.params;
-  const { name, birthDate, peso, altura, responsavelId, tenantId, atividadeId, categoriaId } = req.body;
+  const { name, cpf, birthDate, peso, altura, responsavelId, tenantId, atividadeId, categoriaId } = req.body;
   try {
+    // Validar CPF para maiores de idade
+    if (birthDate && isMaiorIdade(birthDate) && (!cpf || !cpf.isValid(cpf))) {
+      return res.status(400).json({ error: 'CPF válido é obrigatório para alunos maiores de idade' });
+    }
+
+    // Validar CPF (se fornecido)
+    if (cpf && !cpf.isValid(cpf)) {
+      return res.status(400).json({ error: 'CPF inválido' });
+    }
+
     let finalCategoriaId = categoriaId;
     const atividade = await prisma.atividade.findUnique({ where: { id: atividadeId } });
     if (birthDate && atividadeId && atividade?.requerIdade && !categoriaId) {
@@ -53,15 +76,17 @@ const updateAluno = async (req, res) => {
       });
       finalCategoriaId = categoria?.id || null;
     }
+
     const aluno = await prisma.aluno.update({
       where: { id },
       data: {
         name,
+        cpf, // Novo campo
         birthDate: birthDate ? new Date(birthDate) : null,
         peso: peso ? parseFloat(peso) : null,
         altura: altura ? parseFloat(altura) : null,
         categoriaId: finalCategoriaId,
-        responsavelId,
+        responsavelId: birthDate && isMaiorIdade(birthDate) ? null : responsavelId, // Nulo para maiores
         tenantId: tenantId || req.user.tenantId,
       },
     });
