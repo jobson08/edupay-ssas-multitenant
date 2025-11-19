@@ -5,8 +5,8 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -14,124 +14,120 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// === TENANT ===
 model Tenant {
-  id            String               @id @default(uuid())
+  id            String    @id @default(uuid())
   name          String
-  slug          String               @unique
-  cpfCnpj       String?              // Novo: CPF ou CNPJ do cliente
-  plan          String               // Ex.: "basico", "pro"
+  slug          String    @unique
   domain        String?
-  siteData      Json?                // Ex.: { title, description, logoUrl, primaryColor }
-  status        String               // ativo, suspenso, teste, cancelado
+  cpfCnpj       String?
+  plan          String    @default("basico")
+  monthlyFee    Float     @default(0)
+  createdAt     DateTime  @default(now())
   alunos        Aluno[]
-  atividades    Atividade[]          // Atividades escolhidas (futebol, crossfit, academia)
-  categoriasIdade CategoriaIdade[]   // Categorias de idade por tenant
-  users         User[]               // Relação com User
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  usuarios      Usuario[]
+  categorias    CategoriaFinanceira[]
+  movimentacoes Movimentacao[]
+  responsavel Responsavel[]
 }
 
-model User {
-  id            String               @id @default(uuid())
-  name          String?
-  email         String               @unique
-  passwordHash  String
-  role          String               // ADMIN, ALUNO, SUPERADMIN, PROFESSOR, RH, SEGURANCA, OUTRO
-  departamento   String?
-  tenantId      String
-  tenant        Tenant               @relation(fields: [tenantId], references: [id])
-  mensalidades  Mensalidade[]
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
-}
-model Atividade {
-  id            String               @id @default(uuid())
-  tenantId      String
-  tenant        Tenant               @relation(fields: [tenantId], references: [id])
-  nome          String               // Ex.: "Futebol", "CrossFit", "Academia"
-  requerIdade   Boolean              @default(false) // Novo: indica se usa categorias de idade
-  categoriasIdade CategoriaIdade[]   // Categorias de idade (ex.: Sub-7 para futebol)
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
-}
-
-model CategoriaIdade {
-  id            String               @id @default(uuid())
-  tenantId      String
-  tenant        Tenant               @relation(fields: [tenantId], references: [id])
-  atividadeId   String
-  atividade     Atividade            @relation(fields: [atividadeId], references: [id])
-  nome          String               // Ex.: "Sub-7", "Sub-9"
-  idadeMaxima   Int                  // Ex.: 7
-  alunos        Aluno[]              // Alunos associados
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
-}
-
-model Aluno {
-  id            String               @id @default(uuid())
-  name          String
-  cpf           String?              // Novo: CPF do aluno (obrigatório para maiores)
-  birthDate     DateTime?
-  peso          Float?
-  altura        Float?
-  categoriaId   String?
-  categoria     CategoriaIdade?      @relation(fields: [categoriaId], references: [id])
-  responsavelId String?
-  responsavel   Responsavel?         @relation(fields: [responsavelId], references: [id])
-  tenantId      String
-  tenant        Tenant               @relation(fields: [tenantId], references: [id])
-  mensalidades  Mensalidade[]
-  desenvolvimentos DesenvolvimentoMensal[]
-  desempenhos   DesempenhoAtividade[]
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
-}
-
+// === RESPONSÁVEL ===
 model Responsavel {
-  id            String               @id @default(uuid())
-  nome          String
-  email         String?
-  cpf           String?
-  telefone      String?
-  alunos        Aluno[]
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  id        String   @id @default(uuid())
+  name      String
+  cpf       String   @unique
+  phone     String
+  email     String   @unique
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  usuario   Usuario? @relation("ResponsavelUsuario")
+  alunos    Aluno[]
+  createdAt DateTime @default(now())
 }
 
+// === ALUNO ===
+model Aluno {
+  id                String       @id @default(uuid())
+  name              String
+  cpf               String?
+  birthDate         DateTime?
+  phone             String?
+  usuario           Usuario?      @relation("AlunoUsuario") // 1:1 opcional
+  responsavelId     String?
+  responsavel       Responsavel? @relation(fields: [responsavelId], references: [id])
+  monthlyFee        Float        @default(0)
+  dueDay            Int          @default(10)
+  status            String       @default("ativo")
+  tenantId          String
+  tenant            Tenant       @relation(fields: [tenantId], references: [id])
+  movimentacoes     Movimentacao[]
+  mensalidades      Mensalidade[]   // <--- ADICIONE ESTA LINHA!
+  createdAt         DateTime     @default(now())
+}
+// === MENSALIDADE(ALUNOS) ===
 model Mensalidade {
-  id            String               @id @default(uuid())
-  alunoId       String?
-  userId        String?
-  valor         Float
-  vencimento    DateTime
-  status        String               // pendente, pago, atrasado
-  tipo          String               // aluno, funcionario
-  aluno         Aluno?               @relation(fields: [alunoId], references: [id])
-  user          User?                @relation(fields: [userId], references: [id])
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  id             String    @id @default(uuid())
+  alunoId        String
+  aluno          Aluno     @relation(fields: [alunoId], references: [id])
+  month          Int
+  year           Int
+  value          Float
+  dueDate        DateTime
+  paidAt         DateTime?
+  status         String    @default("pendente")
+  movimentacaoId String?
+  movimentacao   Movimentacao? @relation(fields: [movimentacaoId], references: [id])
+  createdAt      DateTime  @default(now())
+
+  @@unique([alunoId, month, year])
 }
 
-model DesenvolvimentoMensal {
-  id            String               @id @default(uuid())
-  alunoId       String
-  aluno         Aluno                @relation(fields: [alunoId], references: [id])
-  mes           Int                  // 1-12
-  ano           Int                  // Ex.: 2025
-  comentario    String?
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+// === USUÁRIO (FUNCIONÁRIO) ===
+model Usuario {
+  id         String   @id @default(uuid())
+  name       String
+  email      String   @unique
+  password   String
+  role       String   @default("TREINADOR")
+  tenantId   String?
+  tenant     Tenant?   @relation(fields: [tenantId], references: [id])
+  responsavel    Responsavel? @relation("ResponsavelUsuario", fields: [responsavelId], references: [id])
+  responsavelId  String?  @unique
+  aluno       Aluno?   @relation("AlunoUsuario", fields: [alunoId], references: [id])
+  alunoId     String?  @unique
+  createdAt  DateTime @default(now())
+  updatedAt      DateTime
+
+  @@index([tenantId])
+  @@index([role])
+  @@index([responsavelId])
+  @@index([alunoId])
 }
 
-model DesempenhoAtividade {
-  id            String               @id @default(uuid())
-  alunoId       String
-  aluno         Aluno                @relation(fields: [alunoId], references: [id])
-  atividade      String               // Ex.: "futebol", "crossfit"
-  data          DateTime
-  metrica       Json?                // Ex.: { gols: 2 } ou { wod: "Fran", tempo: "5:30" }
-  comentario    String?
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+// === CATEGORIA FINANCEIRA ===
+model CategoriaFinanceira {
+  id            String   @id @default(uuid())
+  name          String
+  type          String   // "entrada" | "saida"
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  movimentacoes Movimentacao[]
+  createdAt     DateTime @default(now())
+}
+
+// === MOVIMENTAÇÃO FINANCEIRA ===
+model Movimentacao {
+  id                String             @id @default(uuid())
+  description       String
+  value             Float
+  date              DateTime
+  type              String             // "entrada" | "saida"
+  categoriaId       String
+  categoria         CategoriaFinanceira @relation(fields: [categoriaId], references: [id])
+  tenantId          String
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  alunoId           String?
+  aluno             Aluno?             @relation(fields: [alunoId], references: [id])
+  mensalidades      Mensalidade[]
+  createdAt         DateTime           @default(now())
 }
